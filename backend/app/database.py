@@ -138,3 +138,47 @@ async def get_tube_reliability(hours: int = 24):
                 }
                 for row in rows
             ]
+
+
+async def get_tube_stations():
+    """Return Underground station locations as GeoJSON."""
+
+    async with await psycopg.AsyncConnection.connect(
+        DATABASE_URL,
+        connect_timeout=5
+    ) as connection:
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT
+                    station_id,
+                    station_name,
+                    ST_X(location) AS longitude,
+                    ST_Y(location) AS latitude
+                FROM tube_stations
+                ORDER BY station_name, station_id
+                """
+            )
+
+            rows = await cursor.fetchall()
+
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        row[2],
+                        row[3],
+                    ],
+                },
+                "properties": {
+                    "station_id": row[0],
+                    "station_name": row[1],
+                },
+            }
+            for row in rows
+        ],
+    }
