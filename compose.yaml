@@ -1,0 +1,53 @@
+
+services:
+  api:
+    build:
+      context: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_URL: postgresql://citypulse:citypulse_dev@db:5432/citypulse
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - citypulse-net
+
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: citypulse
+      POSTGRES_PASSWORD: citypulse_dev
+      POSTGRES_DB: citypulse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U citypulse -d citypulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - citypulse-net
+
+  
+  ingestion:
+    build:
+      context: ./backend
+    command: python -m app.ingestion.tube
+    environment:
+      DATABASE_URL: postgresql://citypulse:citypulse_dev@db:5432/citypulse
+      POLL_INTERVAL: "60"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - citypulse-net
+
+
+networks:
+  citypulse-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
