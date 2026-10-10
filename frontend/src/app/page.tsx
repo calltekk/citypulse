@@ -1,9 +1,8 @@
 
 import { Suspense } from "react";
 import AutoRefresh from "./components/AutoRefresh";
-import ReliabilityChart, {
-  type ReliabilityRecord,
-} from "./components/ReliabilityChart";
+import ReliabilityPanel from "./components/ReliabilityPanel";
+import LondonMap from "./components/LondonMap";
 
 // ------------------------------------
 // TYPES
@@ -20,12 +19,6 @@ type TubeLine = {
 type TubeResponse = {
   count: number;
   data: TubeLine[];
-};
-
-type ReliabilityResponse = {
-  window_hours: number;
-  count: number;
-  data: ReliabilityRecord[];
 };
 
 // ------------------------------------
@@ -73,26 +66,6 @@ async function getTubeLines(): Promise<TubeLine[]> {
   return result.data;
 }
 
-async function getReliability(): Promise<ReliabilityRecord[]> {
-  const response = await fetch(
-    `${API_URL}/api/v1/analytics/tube/reliability?hours=24`,
-    {
-      cache: "no-store",
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Reliability API returned ${response.status}`
-    );
-  }
-
-  const result: ReliabilityResponse =
-    await response.json();
-
-  return result.data;
-}
-
 // ------------------------------------
 // HELPERS
 // ------------------------------------
@@ -107,31 +80,13 @@ function isGoodService(status: string): boolean {
 
 async function TubeDashboard() {
   let lines: TubeLine[] = [];
-  let reliability: ReliabilityRecord[] = [];
-
   let error: string | null = null;
-  let analyticsError: string | null = null;
 
-  // Fetch both API endpoints concurrently.
-  // A failure in one does not prevent the other from loading.
-  const [tubeResult, reliabilityResult] =
-    await Promise.allSettled([
-      getTubeLines(),
-      getReliability(),
-    ]);
-
-  if (tubeResult.status === "fulfilled") {
-    lines = tubeResult.value;
-  } else {
+  try {
+    lines = await getTubeLines();
+  } catch {
     error =
       "Unable to retrieve transport data from CityPulse API.";
-  }
-
-  if (reliabilityResult.status === "fulfilled") {
-    reliability = reliabilityResult.value;
-  } else {
-    analyticsError =
-      "Unable to load reliability analytics.";
   }
 
   // ------------------------------------
@@ -313,40 +268,13 @@ async function TubeDashboard() {
           </div>
         </section>
 
-        {/* HISTORICAL ANALYTICS */}
+        {/* INTERACTIVE HISTORICAL ANALYTICS */}
 
-        <section className="mt-8 rounded-2xl border border-slate-800 bg-[#111b2e] p-6">
-          <div className="mb-6">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-400">
-              Historical analytics
-            </p>
+        <ReliabilityPanel />
 
-            <h3 className="text-xl font-semibold">
-              Underground service observations
-            </h3>
+        {/* GEOSPATIAL INTELLIGENCE */}
 
-            <p className="mt-2 text-sm text-slate-400">
-              Percentage of recorded observations not
-              reporting Good Service over the last
-              24 hours.
-            </p>
-          </div>
-
-          {analyticsError ? (
-            <div className="rounded-lg border border-red-900 bg-red-950/40 p-4 text-sm text-red-300">
-              {analyticsError}
-            </div>
-          ) : (
-            <ReliabilityChart data={reliability} />
-          )}
-
-          <p className="mt-4 text-xs text-slate-500">
-            Includes planned closures and other service
-            statuses. Percentages reflect available
-            observations, not incident counts or
-            guaranteed 24-hour coverage.
-          </p>
-        </section>
+        <LondonMap />
 
         {/* FOOTER */}
 
